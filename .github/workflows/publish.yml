@@ -236,5 +236,3 @@ jobs:
           merge-multiple: true
       - name: Release
         run: bun run release -- "${{ needs.resolve-release.outputs.release_type }}" --ci
-        env:
-          GITHUB_TOKEN: ${{ github.token }}

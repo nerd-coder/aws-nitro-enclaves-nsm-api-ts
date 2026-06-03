@@ -111,12 +111,12 @@ release, it chooses the npm release type from the upstream semver delta.
 When a release is needed, `Publish` builds all native artifacts, uses
 `release-it` to bump the npm package version, creates the release commit and
 tag, and publishes to npm through the npm Trusted Publisher configured for
-workflow filename `publish.yml`.
+workflow filename `publish.yml`. The workflow does not create GitHub Releases.
 
-`GITHUB_TOKEN` is provided by GitHub Actions and is used by `release-it` to push
-the release commit/tag and create the GitHub release. npm authentication and
-provenance use OIDC through the workflow's `id-token: write` permission, so no
-`NPM_TOKEN` secret is needed.
+`GITHUB_TOKEN` is provided by GitHub Actions. The checkout credentials let
+`release-it` push the release commit/tag. npm authentication and provenance use
+OIDC through the workflow's `id-token: write` permission, so no `NPM_TOKEN`
+secret is needed.
 
 Recommended branch protection:
 
