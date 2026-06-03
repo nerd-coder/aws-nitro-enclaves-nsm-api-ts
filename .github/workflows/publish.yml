@@ -7,6 +7,8 @@ env:
   CARGO_INCREMENTAL: "1"
 
 on:
+  schedule:
+    - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
       release_type:
@@ -22,19 +24,6 @@ on:
         description: Optional upstream crate version to record and build against
         required: false
         type: string
-  workflow_call:
-    inputs:
-      release_type:
-        description: Semver release type
-        required: true
-        type: string
-      upstream_version:
-        description: Optional upstream crate version to record and build against
-        required: false
-        type: string
-    secrets:
-      NPM_TOKEN:
-        required: true
 
 permissions:
   contents: write
@@ -45,8 +34,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  resolve-release:
+    name: Resolve release
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.resolve.outputs.should_release }}
+      release_type: ${{ steps.resolve.outputs.release_type }}
+      upstream_version: ${{ steps.resolve.outputs.upstream_version }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check upstream crate
+        id: check
+        if: ${{ github.event_name == 'schedule' }}
+        run: node scripts/check-upstream-version.mjs
+      - name: Resolve release inputs
+        id: resolve
+        env:
+          MANUAL_RELEASE_TYPE: ${{ inputs.release_type }}
+          MANUAL_UPSTREAM_VERSION: ${{ inputs.upstream_version }}
+          SCHEDULE_SHOULD_RELEASE: ${{ steps.check.outputs.should_release }}
+          SCHEDULE_RELEASE_TYPE: ${{ steps.check.outputs.release_type }}
+          SCHEDULE_UPSTREAM_VERSION: ${{ steps.check.outputs.latest_version }}
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "should_release=${SCHEDULE_SHOULD_RELEASE}" >> "$GITHUB_OUTPUT"
+            echo "release_type=${SCHEDULE_RELEASE_TYPE}" >> "$GITHUB_OUTPUT"
+            echo "upstream_version=${SCHEDULE_UPSTREAM_VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "release_type=${MANUAL_RELEASE_TYPE}" >> "$GITHUB_OUTPUT"
+            echo "upstream_version=${MANUAL_UPSTREAM_VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Summarize
+        run: |
+          echo "Should release: ${{ steps.resolve.outputs.should_release }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release type: ${{ steps.resolve.outputs.release_type }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Upstream version: ${{ steps.resolve.outputs.upstream_version || 'unchanged' }}" >> "$GITHUB_STEP_SUMMARY"
+
   lint:
     name: Lint
+    needs:
+      - resolve-release
+    if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -56,10 +85,10 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Apply upstream version
-        if: ${{ inputs.upstream_version != '' }}
+        if: ${{ needs.resolve-release.outputs.upstream_version != '' }}
         run: |
-          node scripts/set-upstream-version.mjs "${{ inputs.upstream_version }}"
-          cargo update -p aws-nitro-enclaves-nsm-api --precise "${{ inputs.upstream_version }}"
+          node scripts/set-upstream-version.mjs "${{ needs.resolve-release.outputs.upstream_version }}"
+          cargo update -p aws-nitro-enclaves-nsm-api --precise "${{ needs.resolve-release.outputs.upstream_version }}"
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Lint
@@ -67,6 +96,9 @@ jobs:
 
   build:
     name: Build ${{ matrix.settings.target }}
+    needs:
+      - resolve-release
+    if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -93,10 +125,10 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.settings.target }}
       - name: Apply upstream version
-        if: ${{ inputs.upstream_version != '' }}
+        if: ${{ needs.resolve-release.outputs.upstream_version != '' }}
         run: |
-          node scripts/set-upstream-version.mjs "${{ inputs.upstream_version }}"
-          cargo update -p aws-nitro-enclaves-nsm-api --precise "${{ inputs.upstream_version }}"
+          node scripts/set-upstream-version.mjs "${{ needs.resolve-release.outputs.upstream_version }}"
+          cargo update -p aws-nitro-enclaves-nsm-api --precise "${{ needs.resolve-release.outputs.upstream_version }}"
       - name: Cache cargo
         uses: actions/cache@v5
         with:
@@ -107,7 +139,7 @@ jobs:
             ~/.napi-rs
             .cargo-cache
             target/
-          key: ${{ matrix.settings.host }}-${{ matrix.settings.target }}-cargo-${{ inputs.upstream_version || hashFiles('Cargo.lock') }}
+          key: ${{ matrix.settings.host }}-${{ matrix.settings.target }}-cargo-${{ needs.resolve-release.outputs.upstream_version || hashFiles('Cargo.lock') }}
           restore-keys: |
             ${{ matrix.settings.host }}-${{ matrix.settings.target }}-cargo-
       - name: Install dependencies
@@ -129,7 +161,9 @@ jobs:
   test-bindings:
     name: Test ${{ matrix.settings.target }}
     needs:
+      - resolve-release
       - build
+    if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -162,8 +196,10 @@ jobs:
   publish:
     name: Publish to npm
     needs:
+      - resolve-release
       - lint
       - test-bindings
+    if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -177,7 +213,7 @@ jobs:
           targets: x86_64-unknown-linux-gnu
       - name: Validate release type
         run: |
-          case "${{ inputs.release_type }}" in
+          case "${{ needs.resolve-release.outputs.release_type }}" in
             patch|minor|major) ;;
             *) echo "release_type must be patch, minor, or major" >&2; exit 1 ;;
           esac
@@ -188,22 +224,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Apply upstream version
-        if: ${{ inputs.upstream_version != '' }}
+        if: ${{ needs.resolve-release.outputs.upstream_version != '' }}
         run: |
-          node scripts/set-upstream-version.mjs "${{ inputs.upstream_version }}"
-          cargo update -p aws-nitro-enclaves-nsm-api --precise "${{ inputs.upstream_version }}"
+          node scripts/set-upstream-version.mjs "${{ needs.resolve-release.outputs.upstream_version }}"
+          cargo update -p aws-nitro-enclaves-nsm-api --precise "${{ needs.resolve-release.outputs.upstream_version }}"
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
           pattern: bindings-*
           path: dist
           merge-multiple: true
-      - name: Authenticate npm
-        run: npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Release
-        run: bun run release -- "${{ inputs.release_type }}" --ci
+        run: bun run release -- "${{ needs.resolve-release.outputs.release_type }}" --ci
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

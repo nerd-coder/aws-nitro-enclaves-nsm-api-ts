@@ -103,25 +103,20 @@ GitHub Actions uses `mise.toml` to install Bun and Node, then runs:
 The `CI` workflow builds and smoke-tests all supported native targets on pushes,
 pull requests, and manual runs. It does not publish.
 
-The `Publish` workflow is manual or reusable-workflow only. It accepts a
-`release_type` of `patch`, `minor`, or `major`, builds all native artifacts,
-uses `release-it` to bump the npm package version, creates the release commit
-and tag, and publishes to npm with provenance.
+The `Publish` workflow can be started manually with a `release_type` of `patch`,
+`minor`, or `major`. It also runs daily at `00:00` UTC and checks the upstream
+Rust crate recorded in `.upstream-version`; when crates.io has a newer stable
+release, it chooses the npm release type from the upstream semver delta.
 
-The `Watch upstream` workflow runs daily at `00:00` UTC and checks the upstream
-Rust crate recorded in `.upstream-version`. When crates.io has a newer stable
-release, it calls `Publish`, passes the detected upstream version, and chooses
-the npm release type from the upstream semver delta.
-
-Required repository secret:
-
-- `NPM_TOKEN`: npm automation token with permission to publish
-  `@nerd-coder/aws-nitro-enclaves-nsm-api-ts`.
+When a release is needed, `Publish` builds all native artifacts, uses
+`release-it` to bump the npm package version, creates the release commit and
+tag, and publishes to npm through the npm Trusted Publisher configured for
+workflow filename `publish.yml`.
 
 `GITHUB_TOKEN` is provided by GitHub Actions and is used by `release-it` to push
-the release commit/tag and create the GitHub release. npm provenance is enabled
-through the workflow's `id-token: write` permission, so no separate provenance
-secret is needed.
+the release commit/tag and create the GitHub release. npm authentication and
+provenance use OIDC through the workflow's `id-token: write` permission, so no
+`NPM_TOKEN` secret is needed.
 
 Recommended branch protection:
 
