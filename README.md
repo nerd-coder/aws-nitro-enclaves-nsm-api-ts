@@ -1,87 +1,118 @@
-# `@napi-rs/package-template`
+# AWS Nitro Enclaves NSM API
 
-![https://github.com/napi-rs/package-template/actions](https://github.com/napi-rs/package-template/workflows/CI/badge.svg)
+Node.js bindings for the AWS Nitro Enclaves Nitro Secure Module (NSM) API.
+The package is implemented as a Rust N-API addon and wraps the upstream
+`aws-nitro-enclaves-nsm-api` Rust crate.
 
-> Template project for writing node packages with napi-rs.
+This package is intended for code that runs inside AWS Nitro Enclaves and needs
+direct access to NSM operations such as attestation, PCR inspection, PCR locking,
+and random byte generation.
 
-# Usage
+## Package
 
-1. Click **Use this template**.
-2. **Clone** your project.
-3. Run `yarn install` to install dependencies.
-4. Run `yarn napi rename -n [@your-scope/package-name] -b [binary-name]` command under the project folder to rename your package.
+- npm package: `@nerd-coder/aws-nitro-enclaves-nsm-api-ts`
+- native layer: Rust + napi-rs
+- package manager: Bun, pinned through `mise.toml`
+- supported native targets:
+  - `x86_64-pc-windows-msvc`
+  - `x86_64-apple-darwin`
+  - `aarch64-apple-darwin`
+  - `x86_64-unknown-linux-gnu`
+  - `aarch64-unknown-linux-gnu`
 
-## Install this test package
+## API
 
-```bash
-yarn add @napi-rs/package-template
+The generated ESM entrypoint exports low-level NSM bindings:
+
+```ts
+import {
+  nsmDescribeNsm,
+  nsmExit,
+  nsmGetAttestationDoc,
+  nsmInit,
+} from "@nerd-coder/aws-nitro-enclaves-nsm-api-ts";
+
+const fd = nsmInit();
+
+try {
+  const description = nsmDescribeNsm(fd);
+  const document = nsmGetAttestationDoc(fd);
+
+  console.log(description, document);
+} finally {
+  nsmExit(fd);
+}
 ```
 
-## Ability
+Most calls require a real NSM device and are only expected to work inside an AWS
+Nitro Enclave. Local and CI smoke tests only verify that the generated native
+binding can be imported.
 
-### Build
+## Development
 
-After `yarn build/npm run build` command, you can see `package-template.[darwin|win32|linux].node` file in project root. This is the native addon built from [lib.rs](./src/lib.rs).
+Install the pinned tools with mise:
 
-### Test
-
-With [ava](https://github.com/avajs/ava), run `yarn test/npm run test` to testing native addon. You can also switch to another testing framework if you want.
-
-### CI
-
-With GitHub Actions, each commit and pull request will be built and tested automatically in [`node@20`, `@node22`] x [`macOS`, `Linux`, `Windows`] matrix. You will never be afraid of the native addon broken in these platforms.
-
-### Release
-
-Release native package is very difficult in old days. Native packages may ask developers who use it to install `build toolchain` like `gcc/llvm`, `node-gyp` or something more.
-
-With `GitHub actions`, we can easily prebuild a `binary` for major platforms. And with `N-API`, we should never be afraid of **ABI Compatible**.
-
-The other problem is how to deliver prebuild `binary` to users. Downloading it in `postinstall` script is a common way that most packages do it right now. The problem with this solution is it introduced many other packages to download binary that has not been used by `runtime codes`. The other problem is some users may not easily download the binary from `GitHub/CDN` if they are behind a private network (But in most cases, they have a private NPM mirror).
-
-In this package, we choose a better way to solve this problem. We release different `npm packages` for different platforms. And add it to `optionalDependencies` before releasing the `Major` package to npm.
-
-`NPM` will choose which native package should download from `registry` automatically. You can see [npm](./npm) dir for details. And you can also run `yarn add @napi-rs/package-template` to see how it works.
-
-## Develop requirements
-
-- Install the latest `Rust`
-- Install `Node.js@10+` which fully supported `Node-API`
-- Install `yarn@1.x`
-
-## Test in local
-
-- yarn
-- yarn build
-- yarn test
-
-And you will see:
-
-```bash
-$ ava --verbose
-
-  ✔ sync function from native code
-  ✔ sleep function from native code (201ms)
-  ─
-
-  2 tests passed
-✨  Done in 1.12s.
+```sh
+mise install
 ```
 
-## Release package
+Install dependencies:
 
-Ensure you have set your **NPM_TOKEN** in the `GitHub` project setting.
-
-In `Settings -> Secrets`, add **NPM_TOKEN** into it.
-
-When you want to release the package:
-
-```bash
-npm version [<newversion> | major | minor | patch | premajor | preminor | prepatch | prerelease [--preid=<prerelease-id>] | from-git]
-
-git push
+```sh
+bun install --frozen-lockfile
 ```
 
-GitHub actions will do the rest job for you.
+Build the local native binding:
 
-> WARN: Don't run `npm publish` manually.
+```sh
+bun run build
+```
+
+Run local checks:
+
+```sh
+bun run lint
+bun run smoke
+```
+
+`bun run check` runs linting, builds the local binding, and imports the generated
+entrypoint. The project intentionally does not keep a benchmark harness because
+NSM calls are device-bound and generic benchmark results are not useful for this
+package.
+
+## CI and Release Setup
+
+Keep CI setup notes in this README while the release process stays this small.
+If the workflow grows beyond the required secret and branch protection notes,
+move the detailed operator runbook to `docs/ci.md` and leave a short pointer here.
+
+GitHub Actions uses `mise.toml` to install Bun and Node, then runs:
+
+- `bun install --frozen-lockfile`
+- `bun run lint`
+- target-specific `bun run build ...`
+- `bun run smoke` against downloaded native artifacts
+
+The CI workflow builds and smoke-tests all supported native targets. Release
+publishing runs only on pushes to `main`.
+
+Required repository secret:
+
+- `NPM_TOKEN`: npm automation token with permission to publish
+  `@nerd-coder/aws-nitro-enclaves-nsm-api-ts`.
+
+`GITHUB_TOKEN` is provided by GitHub Actions. npm provenance is enabled through
+the workflow's `id-token: write` permission, so no separate provenance secret is
+needed.
+
+Recommended branch protection:
+
+- Require the `CI` workflow before merging to `main`.
+- Do not allow release commits to bypass CI.
+
+## Dependency Updates
+
+Renovate is configured in `.github/renovate.json`. To enable it, install the
+Renovate GitHub App for this repository and let it open dependency update pull
+requests. The config keeps native CI noise low by grouping non-major updates and
+limiting concurrent Renovate PRs.

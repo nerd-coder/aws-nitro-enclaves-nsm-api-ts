@@ -1,6 +1,6 @@
 
 [package]
-authors = ["LongYinan <lynweklm@gmail.com>"]
+authors = ["Toan <me@toan.io>"]
 edition = "2021"
 name = "aws_nitro_enclaves_nsm_api"
 version = "0.1.0"
@@ -9,8 +9,10 @@ version = "0.1.0"
 crate-type = ["cdylib"]
 
 [dependencies]
+aws-nitro-enclaves-nsm-api = "0.5.1"
 napi = "3.0.0"
 napi-derive = "3.0.0"
+serde_bytes = "0.11.19"
 
 [build-dependencies]
 napi-build = "2"
