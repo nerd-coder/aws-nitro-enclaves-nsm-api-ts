@@ -1,5 +1,8 @@
 # AWS Nitro Enclaves NSM API
 
+[![npm version](https://img.shields.io/npm/v/@nerd-coder/aws-nitro-enclaves-nsm-api-ts.svg)](https://www.npmjs.com/package/@nerd-coder/aws-nitro-enclaves-nsm-api-ts)
+[![upstream crate](https://img.shields.io/crates/v/aws-nitro-enclaves-nsm-api.svg)](https://crates.io/crates/aws-nitro-enclaves-nsm-api/)
+
 Node.js bindings for the AWS Nitro Enclaves Nitro Secure Module (NSM) API.
 The package is implemented as a Rust N-API addon and wraps the upstream
 `aws-nitro-enclaves-nsm-api` Rust crate.
@@ -12,13 +15,17 @@ and random byte generation.
 
 - npm package: `@nerd-coder/aws-nitro-enclaves-nsm-api-ts`
 - native layer: Rust + napi-rs
+- upstream Rust crate:
+  [`aws-nitro-enclaves-nsm-api`](https://crates.io/crates/aws-nitro-enclaves-nsm-api/)
 - package manager: Bun, pinned through `mise.toml`
 - supported native targets:
-  - `x86_64-pc-windows-msvc`
   - `x86_64-apple-darwin`
   - `aarch64-apple-darwin`
   - `x86_64-unknown-linux-gnu`
   - `aarch64-unknown-linux-gnu`
+
+Windows is intentionally unsupported because the upstream Rust driver uses Unix
+file descriptor and `ioctl` APIs.
 
 ## API
 

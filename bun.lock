@@ -12,7 +12,6 @@
         "@nerd-coder/aws-nitro-enclaves-nsm-api-ts-darwin-x64": "0.1.0",
         "@nerd-coder/aws-nitro-enclaves-nsm-api-ts-linux-arm64-gnu": "0.1.0",
         "@nerd-coder/aws-nitro-enclaves-nsm-api-ts-linux-x64-gnu": "0.1.0",
-        "@nerd-coder/aws-nitro-enclaves-nsm-api-ts-win32-x64-msvc": "0.1.0",
       },
     },
   },
