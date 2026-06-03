@@ -1,0 +1,46 @@
+name: Watch upstream
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: watch-upstream
+  cancel-in-progress: false
+
+jobs:
+  check-upstream:
+    name: Check upstream crate
+    runs-on: ubuntu-latest
+    outputs:
+      current_version: ${{ steps.check.outputs.current_version }}
+      latest_version: ${{ steps.check.outputs.latest_version }}
+      release_type: ${{ steps.check.outputs.release_type }}
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check crates.io
+        id: check
+        run: node scripts/check-upstream-version.mjs
+      - name: Summarize
+        run: |
+          echo "Current upstream: ${{ steps.check.outputs.current_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Latest upstream: ${{ steps.check.outputs.latest_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Should release: ${{ steps.check.outputs.should_release }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release type: ${{ steps.check.outputs.release_type }}" >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish upstream refresh
+    needs:
+      - check-upstream
+    if: ${{ needs.check-upstream.outputs.should_release == 'true' }}
+    uses: ./.github/workflows/publish.yml
+    with:
+      release_type: ${{ needs.check-upstream.outputs.release_type }}
+      upstream_version: ${{ needs.check-upstream.outputs.latest_version }}
+    secrets: inherit

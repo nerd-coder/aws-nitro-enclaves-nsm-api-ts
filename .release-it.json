@@ -1,0 +1,28 @@
+{
+	"$schema": "https://unpkg.com/release-it@20/schema/release-it.json",
+	"git": {
+		"commitMessage": "chore: release v${version}",
+		"requireBranch": "main",
+		"requireCleanWorkingDir": false,
+		"tagName": "v${version}"
+	},
+	"github": {
+		"release": true
+	},
+	"hooks": {
+		"before:init": "git fetch --prune --prune-tags origin",
+		"after:bump": [
+			"bun run sync-release-version",
+			"bun install --lockfile-only",
+			"bun run build --target x86_64-unknown-linux-gnu",
+			"bun run napi create-npm-dirs",
+			"bun run artifacts",
+			"git add package.json bun.lock Cargo.toml Cargo.lock .upstream-version"
+		]
+	},
+	"npm": {
+		"publish": true,
+		"publishArgs": ["--access", "public", "--provenance"],
+		"skipChecks": true
+	}
+}
