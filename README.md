@@ -54,3 +54,7 @@ try {
 Most calls require a real NSM device and are only expected to work inside an AWS
 Nitro Enclave. Local and CI smoke tests only verify that the generated native
 binding can be imported.
+
+## License
+
+[Apache 2.0](LICENSE)
