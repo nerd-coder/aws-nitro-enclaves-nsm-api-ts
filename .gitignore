@@ -5,6 +5,9 @@
 /artifacts/
 /dist/
 /npm/
+# Perry vendor prebuilts are produced in CI and packed into the npm tarball;
+# keep them out of git (large binaries).
+/prebuilt/
 
 #Added by cargo
 /target

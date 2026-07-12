@@ -34,6 +34,7 @@
 		"dist/index.js",
 		"dist/index.d.ts",
 		"src/",
+		"prebuilt/",
 		"Cargo.toml",
 		"Cargo.lock",
 		"build.rs",
@@ -61,6 +62,7 @@
 		"build": "napi build --platform --release --esm --output-dir=./dist --no-default-features --features napi",
 		"build:debug": "napi build --platform --esm --output-dir=./dist --no-default-features --features napi",
 		"build:perry": "cargo build --release",
+		"build:perry:prebuilt": "node scripts/stage-perry-prebuilt.mjs",
 		"check": "bun run lint && bun run build && bun run smoke",
 		"lint": "cargo fmt -- --check && cargo clippy --all-targets --no-default-features --features napi -- -D warnings && cargo clippy --all-targets --features perry -- -D warnings",
 		"prepublishOnly": "napi pre-publish -t npm",
@@ -167,16 +169,17 @@
 				}
 			],
 			"targets": {
-				"macos": {
-					"crate": ".",
-					"lib": "libaws_nitro_enclaves_nsm_api.a",
-					"cargo_features": [],
-					"frameworks": []
+				"macos-arm64": {
+					"prebuilt": "./prebuilt/macos-arm64/libaws_nitro_enclaves_nsm_api.a"
 				},
-				"linux": {
-					"crate": ".",
-					"lib": "libaws_nitro_enclaves_nsm_api.a",
-					"cargo_features": []
+				"macos-x64": {
+					"prebuilt": "./prebuilt/macos-x64/libaws_nitro_enclaves_nsm_api.a"
+				},
+				"linux-arm64": {
+					"prebuilt": "./prebuilt/linux-arm64/libaws_nitro_enclaves_nsm_api.a"
+				},
+				"linux-x64": {
+					"prebuilt": "./prebuilt/linux-x64/libaws_nitro_enclaves_nsm_api.a"
 				},
 				"windows": {
 					"available": false,

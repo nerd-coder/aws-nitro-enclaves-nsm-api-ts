@@ -193,12 +193,72 @@ jobs:
       - name: Import binding
         run: bun run smoke
 
+  # Perry vendor prebuilts: release staticlibs for each supported
+  # OS/arch so consumers can `perry compile` without a Rust toolchain.
+  # Layout matches package.json `perry.nativeLibrary.targets.<os>-<arch>.prebuilt`.
+  build-perry-prebuilt:
+    name: Perry prebuilt ${{ matrix.settings.perry_arch }}
+    needs:
+      - resolve-release
+    if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-15-intel
+            rust_target: x86_64-apple-darwin
+            perry_arch: macos-x64
+          - host: macos-15
+            rust_target: aarch64-apple-darwin
+            perry_arch: macos-arm64
+          - host: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            perry_arch: linux-x64
+          - host: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-gnu
+            perry_arch: linux-arm64
+    runs-on: ${{ matrix.settings.host }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jdx/mise-action@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.settings.rust_target }}
+      - name: Apply upstream version
+        if: ${{ needs.resolve-release.outputs.upstream_version != '' }}
+        run: |
+          node scripts/set-upstream-version.mjs "${{ needs.resolve-release.outputs.upstream_version }}"
+          cargo update -p aws-nitro-enclaves-nsm-api --precise "${{ needs.resolve-release.outputs.upstream_version }}"
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            .cargo-cache
+            target/
+          key: perry-prebuilt-${{ matrix.settings.host }}-${{ matrix.settings.rust_target }}-${{ needs.resolve-release.outputs.upstream_version || hashFiles('Cargo.lock') }}
+          restore-keys: |
+            perry-prebuilt-${{ matrix.settings.host }}-${{ matrix.settings.rust_target }}-
+      - name: Build and stage Perry staticlib
+        run: bun run build:perry:prebuilt -- --target ${{ matrix.settings.rust_target }}
+      - name: Upload Perry prebuilt
+        uses: actions/upload-artifact@v7
+        with:
+          name: perry-prebuilt-${{ matrix.settings.perry_arch }}
+          path: prebuilt/${{ matrix.settings.perry_arch }}/libaws_nitro_enclaves_nsm_api.a
+          if-no-files-found: error
+
   publish:
     name: Publish to npm
     needs:
       - resolve-release
       - lint
       - test-bindings
+      - build-perry-prebuilt
     if: ${{ needs.resolve-release.outputs.should_release == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -228,11 +288,32 @@ jobs:
         run: |
           node scripts/set-upstream-version.mjs "${{ needs.resolve-release.outputs.upstream_version }}"
           cargo update -p aws-nitro-enclaves-nsm-api --precise "${{ needs.resolve-release.outputs.upstream_version }}"
-      - name: Download artifacts
+      - name: Download N-API artifacts
         uses: actions/download-artifact@v8
         with:
           pattern: bindings-*
           path: dist
           merge-multiple: true
+      - name: Download Perry prebuilts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: perry-prebuilt-*
+          path: perry-prebuilt-artifacts
+      - name: Stage Perry prebuilts into package layout
+        run: |
+          set -euo pipefail
+          for dir in perry-prebuilt-artifacts/perry-prebuilt-*; do
+            [ -d "$dir" ] || continue
+            arch="${dir##*/perry-prebuilt-}"
+            mkdir -p "prebuilt/${arch}"
+            cp "$dir"/libaws_nitro_enclaves_nsm_api.a "prebuilt/${arch}/"
+          done
+          echo "Staged Perry prebuilts:"
+          find prebuilt -type f -print
+          # Fail the release if any declared vendor prebuilt is missing.
+          for arch in macos-arm64 macos-x64 linux-arm64 linux-x64; do
+            test -f "prebuilt/${arch}/libaws_nitro_enclaves_nsm_api.a" \
+              || { echo "missing prebuilt/${arch}/libaws_nitro_enclaves_nsm_api.a" >&2; exit 1; }
+          done
       - name: Release
         run: bun run release -- "${{ needs.resolve-release.outputs.release_type }}" --ci
