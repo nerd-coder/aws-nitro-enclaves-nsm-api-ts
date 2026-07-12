@@ -1,6 +1,7 @@
 # AWS Nitro Enclaves NSM API
 
 [![npm version](https://img.shields.io/npm/v/@nerd-coder/aws-nitro-enclaves-nsm-api-ts.svg)](https://www.npmjs.com/package/@nerd-coder/aws-nitro-enclaves-nsm-api-ts)
+[![Publish](https://github.com/nerd-coder/aws-nitro-enclaves-nsm-api-ts/actions/workflows/publish.yml/badge.svg)](https://github.com/nerd-coder/aws-nitro-enclaves-nsm-api-ts/actions/workflows/publish.yml)
 [![upstream crate](https://img.shields.io/crates/v/aws-nitro-enclaves-nsm-api.svg)](https://crates.io/crates/aws-nitro-enclaves-nsm-api/)
 
 Bindings for the AWS Nitro Enclaves Nitro Secure Module (NSM) API.
