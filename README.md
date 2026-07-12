@@ -3,9 +3,14 @@
 [![npm version](https://img.shields.io/npm/v/@nerd-coder/aws-nitro-enclaves-nsm-api-ts.svg)](https://www.npmjs.com/package/@nerd-coder/aws-nitro-enclaves-nsm-api-ts)
 [![upstream crate](https://img.shields.io/crates/v/aws-nitro-enclaves-nsm-api.svg)](https://crates.io/crates/aws-nitro-enclaves-nsm-api/)
 
-Node.js bindings for the AWS Nitro Enclaves Nitro Secure Module (NSM) API.
-The package is implemented as a Rust N-API addon and wraps the upstream
-`aws-nitro-enclaves-nsm-api` Rust crate.
+Bindings for the AWS Nitro Enclaves Nitro Secure Module (NSM) API.
+The package wraps the upstream [`aws-nitro-enclaves-nsm-api`](https://crates.io/crates/aws-nitro-enclaves-nsm-api/)
+Rust crate and ships two runtimes:
+
+| Runtime | Mechanism | Install |
+| --- | --- | --- |
+| **Node.js / Bun** | Rust N-API addon (`napi-rs`) | prebuilt platform packages |
+| **[Perry](https://docs.perryts.com/)** | `perry-ffi` staticlib + `perry.nativeLibrary` | source-built by `perry compile` |
 
 This package is intended for code that runs inside AWS Nitro Enclaves and needs
 direct access to NSM operations such as attestation, PCR inspection, PCR locking,
@@ -14,7 +19,7 @@ and random byte generation.
 ## Package
 
 - npm package: `@nerd-coder/aws-nitro-enclaves-nsm-api-ts`
-- native layer: Rust + napi-rs
+- native layer: Rust + napi-rs (Node) / perry-ffi (Perry)
 - upstream Rust crate:
   [`aws-nitro-enclaves-nsm-api`](https://crates.io/crates/aws-nitro-enclaves-nsm-api/)
 - package manager: Bun, pinned through `mise.toml`
@@ -29,7 +34,7 @@ file descriptor and `ioctl` APIs.
 
 ## API
 
-The generated ESM entrypoint exports low-level NSM bindings:
+The same low-level NSM surface is exported for both runtimes:
 
 ```ts
 import {
@@ -51,9 +56,53 @@ try {
 }
 ```
 
+### Node.js / Bun
+
+Uses the prebuilt N-API addon under `dist/` (plus optional platform packages).
+Local and CI smoke tests only verify that the generated native binding can be
+imported.
+
+### Perry
+
+The package declares a `perry.nativeLibrary` block in `package.json`. When you
+`import` this package from a Perry program, the compiler:
+
+1. Reads the manifest (`abiVersion: "0.5"`, `functions[]`, targets)
+2. Resolves the TypeScript surface via the `exports["."].perry` condition (`src/index.ts`)
+3. Builds the Rust crate (default feature set includes `perry`) and links the
+   `js_nsm_*` `extern "C"` symbols into your binary
+
+```sh
+bun add @nerd-coder/aws-nitro-enclaves-nsm-api-ts
+```
+
+Host programs must allow-list native libraries (Perry security gate):
+
+```json
+{
+  "perry": {
+    "allow": {
+      "nativeLibrary": ["@nerd-coder/aws-nitro-enclaves-nsm-api-ts"]
+    }
+  }
+}
+```
+
+```sh
+perry compile main.ts -o main
+```
+
+Validate the binding locally (requires the `perry` CLI):
+
+```sh
+bun run build:perry
+bun run validate:perry
+# or
+perry native validate
+```
+
 Most calls require a real NSM device and are only expected to work inside an AWS
-Nitro Enclave. Local and CI smoke tests only verify that the generated native
-binding can be imported.
+Nitro Enclave.
 
 ## License
 

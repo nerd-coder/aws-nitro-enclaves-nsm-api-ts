@@ -1,18 +1,33 @@
-
 [package]
-authors = ["Toan <me@toan.io>"]
-edition = "2021"
 name = "aws_nitro_enclaves_nsm_api"
 version = "0.1.0"
+edition = "2021"
+description = "Node.js (N-API) and Perry native bindings for the AWS Nitro Enclaves NSM API"
+repository = "https://github.com/nerd-coder/aws-nitro-enclaves-nsm-api-ts"
+license = "Apache-2.0"
+authors = ["Toan <me@toan.io>"]
+readme = "README.md"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+# Perry is the default so plain `cargo build --release` (used by
+# `perry native validate` / `perry compile`) produces the staticlib
+# with `js_nsm_*` exports. Node builds opt into N-API explicitly via
+# `--no-default-features --features napi`.
+default = ["perry"]
+napi = ["dep:napi", "dep:napi-derive"]
+perry = ["dep:perry-ffi"]
 
 [dependencies]
 aws-nitro-enclaves-nsm-api = "0.5.2"
-napi = "3.0.0"
-napi-derive = "3.0.0"
 serde_bytes = "0.11.19"
+napi = { version = "3.0.0", optional = true }
+napi-derive = { version = "3.0.0", optional = true }
+# Tracks the perry-ffi v0.5 ABI surface from PerryTS/perry. Git URL until
+# perry-ffi is published on crates.io (v0.6.0 plan).
+perry-ffi = { git = "https://github.com/PerryTS/perry", branch = "main", optional = true }
 
 [build-dependencies]
 napi-build = "2"
