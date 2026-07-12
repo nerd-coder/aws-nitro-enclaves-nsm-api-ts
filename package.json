@@ -1,6 +1,6 @@
 {
 	"name": "@nerd-coder/aws-nitro-enclaves-nsm-api-ts",
-	"version": "0.1.3",
+	"version": "0.1.4",
 	"description": "Node.js and Perry bindings for the AWS Nitro Enclaves NSM API, implemented in Rust.",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -81,10 +81,10 @@
 	},
 	"packageManager": "bun@1.3.14",
 	"optionalDependencies": {
-		"@nerd-coder/aws-nitro-enclaves-nsm-api-ts-darwin-x64": "0.1.3",
-		"@nerd-coder/aws-nitro-enclaves-nsm-api-ts-linux-x64-gnu": "0.1.3",
-		"@nerd-coder/aws-nitro-enclaves-nsm-api-ts-linux-arm64-gnu": "0.1.3",
-		"@nerd-coder/aws-nitro-enclaves-nsm-api-ts-darwin-arm64": "0.1.3"
+		"@nerd-coder/aws-nitro-enclaves-nsm-api-ts-darwin-x64": "0.1.4",
+		"@nerd-coder/aws-nitro-enclaves-nsm-api-ts-linux-x64-gnu": "0.1.4",
+		"@nerd-coder/aws-nitro-enclaves-nsm-api-ts-linux-arm64-gnu": "0.1.4",
+		"@nerd-coder/aws-nitro-enclaves-nsm-api-ts-darwin-arm64": "0.1.4"
 	},
 	"perry": {
 		"nativeLibrary": {
